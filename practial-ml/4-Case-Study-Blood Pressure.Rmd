@@ -1,0 +1,205 @@
+---
+title: "Case Study: Predict Book Pressure"
+output: html_notebook
+---
+
+
+Load necessary libraries
+
+```{r}
+library(tidyverse)
+```
+
+Load health data set
+
+```{r}
+health <- read_csv("health.csv")
+```
+
+Preview Data
+
+```{r}
+glimpse(health)
+```
+Convert variables $diabetes, $smoker into factors
+
+```{r}
+health <- health %>%
+  mutate(diabetes = as.factor(diabetes)) %>%
+  mutate(smoker = as.factor(smoker))
+
+```
+
+<h3> EDA Section
+
+``` {r}
+summary(health)
+```
+
+Histogram: systoilic blood pressure - statistical distribution of the predicted variable
+
+```{r}
+health %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x = systolic), fill = "lightblue", color = "black") +
+  theme_minimal()
+```
+
+Statistical distribution of the predictor variables
+
+```{r}
+health %>%
+  select(-systolic) %>%
+  keep(is.numeric) %>%
+  gather() %>%
+  ggplot () +
+    geom_histogram(mapping = aes(x=value,fill=key), color = "black") +
+    facet_wrap(~ key, scales = "free") +
+  theme_minimal()
+```
+
+Correlation analysis among peredictor variables
+
+```{r}
+cor(health[, c("systolic", "weight", "height", "bmi", "waist", "age", "fastfood")])
+
+```
+
+Visualize Correlations of Independent Variables
+
+``` {r}
+corrplot(health_correlations, type="upper")
+
+```
+Simple Linear regression model - single variable (age)
+
+```{r}
+health_mod1 <-  lm(data = health, systolic ~ age)
+
+summary(health_mod1)
+```
+Multiple Linear Regression Model
+
+``` {r}
+health_mod2 <- lm(data = health, systolic ~ .)
+
+summary(health_mod2)
+
+```
+Run Test for zero mean of residuals
+
+```{r}
+mean(health_mod2$residuals)
+
+library(olsrr)
+
+ols_plot_resid_hist(health_mod2)
+
+```
+Check Presence of Heterodasticity
+
+```{r}
+ols_plot_resid_fit(health_mod2)
+```
+Run test for residual autocorrelation {Durbin-Watson Statistic}
+
+```{r}
+library(car)
+
+durbinWatsonTest(health_mod2)
+
+
+```
+
+Check for influencial points in health data (outliers)
+
+```{r}
+ols_plot_cooksd_chart(health_mod2)
+
+```
+
+Review statistical distribution of the outliers
+
+```{r}
+outlier_index <- as.numeric(unlist(ols_plot_cooksd_chart(health_mod2, print_plot = FALSE)$outliers[,"observation"]))
+outlier_index
+```
+
+Compare Summary Statistics of Outliers
+
+``` {r}
+summary(health[outlier_index,])
+
+```
+
+Outliers Removed
+
+```{r}
+summary(health[-outlier_index,])
+```
+
+Remove Outliers from Dataset
+
+```{r}
+health2 <- health[-outlier_index,]
+```
+
+Test for multicollinearity - (VIF above 5.0 indicates multicollinearity)
+
+```{r}
+ols_vif_tol(health_mod2)
+```
+
+Build a model accounting for multicollinearity
+
+```{r}
+health_mod3 <- lm(data=health2, systolic ~ weight+age+diabetes)
+
+summary(health_mod3)
+```
+Introduce non-linear predictors in the model
+
+```{r}
+health2 <- health2 %>%
+  mutate(age2 = age^2,
+         lage=log(age))
+
+```
+
+Build model with ols_step_both_p() function from olsrr package
+
+```{r}
+
+ols_step_both_p(
+  model = lm (
+    data = health2,
+    systolic ~ weight * diabetes + age * diabetes + age2 * diabetes + lage * diabetes
+  ),
+  pent = 0.2,
+  prem = 0.01,
+  details = TRUE
+)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
