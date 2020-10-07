@@ -1,5 +1,5 @@
 ---
-title: "Case Study: Predict Book Pressure"
+title: "Case Study: Predict Blood Pressure"
 output: html_notebook
 ---
 

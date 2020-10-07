@@ -170,6 +170,7 @@ donors_train %>%
   select(respondedMailing) %>%
   table()
 
+<<<<<<< HEAD
 donors_mod1 <- glm(data=donors_train, family = binomial, formula = respondedMailing ~.)
 
 
@@ -264,6 +265,11 @@ sum(diag(donors_pred2_table)) / nrow(donors_test)
 
 
 
+=======
+rs_mod1 <- glm(data=donors_train, family = binomial, formula = respondedMailing ~.)
+
+summary(rs_mod1)
+>>>>>>> cb4ba8ad8aadcedc512f067cfb489d77ebc599fc
 
 
 

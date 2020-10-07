@@ -1,0 +1,238 @@
+---
+title: "Case Study: Income Prediction"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+<h1> Methodology: CRISP-DM Cross Industry Standard Process for Data mining</h1>
+
+![Crisp DM ](/home/datahawk/code/dswithr/rprogramming/practial-ml/crisp-dm.png)
+
+<h2> Business Understanding </h2>
+Marketing department at a financial planning company would like to identify prospective customers from a database that it purchases.
+The target customer is anyone with an annual income over $50,000, but we do not get income information about our new customers.
+Therefore, we'd like to develop a model that analyzes other factors to help us predict whether a potential custom has an income over the $50,000
+threshold.
+We'll use logistic regression for this task
+
+
+<h2> Data Understanding </h2>
+
+```{r}
+library(tidyverse)
+income <- read_csv("income.csv", col_types = "nffnfffffnff")
+glimpse(income)
+```
+
+<h3> Data Exploration </h3>
+
+``` {r}
+income %>%
+  keep(is.factor) %>%
+  summary()
+```
+Value Distribution of variable: workClassification
+
+``` {r}
+
+income %>%
+  select(workClassification) %>%
+  table()
+
+```
+
+Value Distribution of variable: educationLevel
+
+```{r}
+
+income %>%
+  select(educationLevel) %>%
+  table()
+
+```
+
+Value Distribution of variable: occupation
+
+``` {r}
+income %>%
+  select(occupation) %>%
+  table()
+
+```
+
+Value Distribution of variable: nativeCountry
+
+``` {r}
+income %>%
+  select(nativeCountry) %>%
+  table()
+
+```
+
+<h2> Data Preparation </h2>
+
+Replace unknown values for workClassification, occupation, and nativeCountry with code (UNK)
+
+``` {r}
+
+income <- income %>%
+  mutate(workClassification = dplyr::recode(workClassification, "?" = "UNK")) %>%
+  mutate(nativeCountry = dplyr::recode(nativeCountry, "?" = "UNK")) %>%
+  mutate(occupation = dplyr::recode(occupation, "?" = "UNK"))
+
+income %>%
+  select(workClassification,nativeCountry,occupation) %>%
+  summary()
+```
+
+Transform income variable to binary
+
+``` {r}
+income <- income %>%
+  mutate(income = dplyr::recode(income, "<=50K" = "0")) %>%
+  mutate(income = dplyr::recode(income, ">50K" = "1"))
+
+income %>%
+  select(income) %>%
+  summary()
+
+```
+
+Splitting Testing and Training Data Set
+
+
+``` {r}
+
+set.seed(1234)
+sample_set <- sample(nrow(income), round(nrow(income) * .75), replace = FALSE)
+
+income_train <- income[sample_set, ]
+income_test <-income[-sample_set,]
+
+nrow(income_train)
+nrow(income_test)
+
+income_train %>%
+  nrow()
+```
+
+Check Class Distribution
+
+``` {r}
+
+colnames(income)
+
+income %>%
+  select(income) %>%
+  table() %>%
+  prop.table() * 100
+
+
+income_train %>%
+  select(income) %>%
+  table() %>%
+  prop.table() * 100
+
+
+income_test %>%
+  select(income) %>%
+  table() %>%
+  prop.table() * 100
+```
+Balance the training data set with SMOTE()
+
+``` {r}
+library(DMwR)
+set.seed(1234)
+income_train <- SMOTE(income ~ ., data.frame(income_train), perc.over = 100, perc.under = 200 )
+
+income_train %>%
+  select(income) %>%
+  table() %>%
+  prop.table() * 100
+```
+
+<h2> Modeling </h2>
+
+Training The Model
+
+``` {r}
+income_mod1 <- income_train %>%
+  keep(is.factor) %>%
+  glm(formula = income ~ . , family = binomial)
+
+summary(income_mod1)
+
+```
+
+<h2> Evaluation </h2>
+
+Generating predictions against data - probabilities from 0 - 1
+
+``` {r}
+income_pred1 <- predict(income_mod1, income_test, type = 'response')
+
+head(income_pred1)
+```
+
+Determine the ideal cutt-off point with function: ideal_cuttoff
+
+``` {r}
+library(InformationValue)
+
+ideal_cutoff <- 
+  optimalCutoff(
+    actuals = income_test$income,
+    predictedScores = income_pred1,
+    optimiseFor = "Both"
+  )
+
+ideal_cutoff
+
+```
+
+Recode predictions using the ideal cutt-off
+
+``` {r}
+income_pred1 <- ifelse(income_pred1 >= ideal_cutoff, 1, 0)
+
+head(income_pred1)
+
+```
+
+Evaluate model against test data
+
+``` {r}
+income_pred1.table <- table(income_test$income, income_pred1)
+
+sum(diag(income_pred1.table)) / nrow(income_test)
+
+```
+
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
