@@ -1,0 +1,270 @@
+---
+title: "Donors Case Study - k-NN"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+<h2> Business Understanding </h2>
+
+Prospecting for Potential Donors - 
+The goals is to help a veterans' organization determine which donors would most likely to respond to mailing based on their demographic information, prior giving history, and response to prior mailings
+
+<h2> Data Understanding </h2>
+
+```{r}
+library(tidyverse)
+
+donors.src.data <- read_csv("data/donors.csv", col_types = "nnnnnnnnnnnnffffffffff")
+
+glimpse(donors.src.data)
+
+```
+<h2> Data Preparation </h2>
+
+<h3> Dealing with Missing Data </h3>
+
+``` {r}
+
+summary(donors.src.data)
+
+```
+
+Resolve missing age feature with mean imputation
+
+``` {r}
+donors.src.data <- donors.src.data %>%
+  mutate(age = ifelse(is.na(age), mean(age, na.rm = TRUE), age))
+
+donors.src.data %>%
+  select(age) %>%
+  summary()
+
+```
+
+Resolve missing number of children with median imputation
+
+``` {r}
+donors.src.data <- donors.src.data %>%
+  mutate(numberChildren = ifelse(is.na(numberChildren), median(numberChildren, na.rm = TRUE), numberChildren))
+
+donors.src.data %>%
+  select(numberChildren) %>%
+  summary()
+
+```
+
+Exclude values for incomeRating, wealthRating, urbanicity, gender
+
+``` {r}
+donors.src.data <- donors.src.data %>%
+  filter(!is.na(incomeRating) & !is.na(wealthRating) & wealthRating > 0 & !is.na(urbanicity) & !is.na(gender))
+
+donors.src.data %>%
+  select(incomeRating, wealthRating, urbanicity, gender,isHomeowner) %>%
+  summary()
+
+```
+
+Remove feature: isHomeowner
+
+```{r}
+donors.model.data <- select(donors.src.data, -isHomeowner)
+```
+
+Review data cleansing progress
+
+``` {r}
+nrow(donors.model.data)
+donors.model.data %>%
+  summary()
+```
+
+Build Normalizaiton Function
+
+```{r}
+
+normalize <- function(x) {
+  return((x - min(x)) / (max(x) - min(x)))
+}
+
+```
+
+Apply Normalization Function to the dataset
+
+```{r}
+
+donors.model.data <- donors.model.data %>%
+  mutate(age = normalize(age)) %>%
+  mutate(numberChildren = normalize(numberChildren)) %>%
+  mutate(incomeRating = normalize(incomeRating)) %>%
+  mutate(wealthRating = normalize(wealthRating)) %>%
+  mutate(mailOrderPurchases = normalize(mailOrderPurchases)) %>%
+  mutate(totalGivingAmount = normalize(totalGivingAmount)) %>%
+  mutate(numberGifts = normalize(numberGifts)) %>%
+  mutate(smallestGiftAmount = normalize(smallestGiftAmount)) %>%
+  mutate(largestGiftAmount = normalize(largestGiftAmount)) %>%
+  mutate(averageGiftAmount = normalize(averageGiftAmount)) %>%
+  mutate(yearsSinceFirstDonation = normalize(yearsSinceFirstDonation)) %>%
+  mutate(monthsSinceLastDonation = normalize(monthsSinceLastDonation))
+
+donors.model.data %>%
+  summary()
+
+```
+
+Dealing with Categorical Features
+
+``` {r}
+class(donors.model.data)
+
+donors.model.data <- data.frame(donors.model.data)
+#donors.model.data <- na.omit(donors.model.data)
+donors.labels <- donors.model.data %>% select(respondedMailing)
+donors.data <- donors.model.data %>% select(-respondedMailing)
+
+colnames(donors.data)
+```
+
+Adding Categorical Features
+
+```{r}
+library(dummies)
+#donors.data <- na.omit(donors.data)
+donors.data <- dummy.data.frame(data=donors.data, sep="_")
+colnames(donors.data)
+
+summary(donors.data)
+
+```
+
+Splitting the data
+
+```{r}
+set.seed(1234)
+sample_donors_index <- sample(nrow(donors.data), round(nrow(donors.data) * .75), replace = FALSE)
+
+donors.train <- donors.data[sample_donors_index, ]
+donors.test <-  donors.data[-sample_donors_index, ]
+```
+
+Splitting Class Labels
+
+```{r}
+donors.train.labels <- as.factor(donors.labels[sample_donors_index, ])
+donors.test.labels <- as.factor(donors.labels[-sample_donors_index, ])
+donors.labels
+donors.train.labels
+```
+
+Classifying Unlabeld data
+
+```{r}
+library(class)
+
+donors_pred1 <- 
+  knn(
+    train = donors.train,
+    test = donors.test,
+    cl = donors.train.labels,
+    k = 15
+  )
+
+```
+<h2> Evaluation </h2>
+
+```{r}
+head(donors_pred1)
+
+```
+
+Confusion Matrix
+
+```{r}
+donors_pred1_table <- table(donors.test.labels, donors_pred1)
+donors_pred1_table
+```
+
+Build a second model
+
+```{r}
+library(class)
+
+donors_pred2 <- 
+  knn(
+    train = donors.train,
+    test = donors.test,
+    cl = donors.train.labels,
+    k = round(sqrt(nrow(donors.train)))
+  )
+
+```
+
+Evaluate Second Model
+
+```{r}
+donors_pred2_table <- table(donors.test.labels, donors_pred2)
+donors_pred2_table
+```
+
+```{r}
+sum(diag(donors_pred2_table)) / nrow(donors.test)
+```
+
+Balance Training Data Set
+
+```{r}
+library(DMwR)
+colnames(donors.model.data)
+donors.data.balanced <- SMOTE(respondedMailing ~ ., donors.model.data, perc.over = 100, perc.under = 200)
+
+donors.data.balanced %>%
+  select(respondedMailing) %>%
+  table()
+
+sample_bal_index <- sample(nrow(donors.data.balanced), round(nrow(donors.data.balanced) * 0.75), replace = FALSE)
+
+donors.labels.bal <- donors.data.balanced %>% select(respondedMailing)
+
+
+donors.data.bal.nopredictor <- donors.data.balanced %>% select(-respondedMailing)
+
+donors.data.bal.categorical <- dummy.data.frame(data=donors.data.bal.nopredictor, sep = "_")
+
+donors.train.bal <-  donors.data.bal.categorical[sample_bal_index, ]
+donors.test.bal <-  donors.data.bal.categorical[-sample_bal_index, ]
+
+donors.train.labels.bal <- as.factor(donors.labels.bal[sample_bal_index,])
+donors.test.labels.bal <- as.factor(donors.labels.bal[-sample_bal_index,])
+
+# Train the Model
+
+library(class)
+
+donor.pred3 <- 
+  knn(
+    train = donors.train.bal,
+    test = donors.test.bal,
+    cl = donors.train.labels.bal,
+    k = round(sqrt(nrow(donors.data.bal.categorical)))
+  )
+
+# Evalute model 
+
+head(donor.pred3)
+
+donors.pred3.table <- table(donors.test.labels.bal, donor.pred3)
+donors.pred3.table
+
+# Model Accuracy
+
+sum(diag(donors.pred3.table)) / nrow(donors.test.bal)
+
+```
+
+
+
+
+
+
+

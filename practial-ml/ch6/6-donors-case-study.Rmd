@@ -1,0 +1,248 @@
+---
+title: "Donors Case Study - k-NN"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+<h2> Business Understanding </h2>
+
+Prospecting for Potential Donors - 
+The goals is to help a veterans' organization determine which donors would most likely to respond to mailing based on their demographic information, prior giving history, and response to prior mailings
+
+<h2> Data Understanding </h2>
+
+```{r}
+library(tidyverse)
+
+donors.src.data <- read_csv("data/donors.csv", col_types = "nnnnnnnnnnnnffffffffff")
+
+glimpse(donors.src.data)
+
+```
+<h2> Data Preparation </h2>
+
+<h3> Dealing with Missing Data </h3>
+
+``` {r}
+
+summary(donors.src.data)
+
+```
+
+Resolve missing age feature with mean imputation
+
+``` {r}
+donors.src.data <- donors.src.data %>%
+  mutate(age = ifelse(is.na(age), mean(age, na.rm = TRUE), age))
+
+donors.src.data %>%
+  select(age) %>%
+  summary()
+
+```
+
+Resolve missing number of children with median imputation
+
+``` {r}
+donors.src.data <- donors.src.data %>%
+  mutate(numberChildren = ifelse(is.na(numberChildren), median(numberChildren, na.rm = TRUE), numberChildren))
+
+donors.src.data %>%
+  select(numberChildren) %>%
+  summary()
+
+```
+
+Exclude values for incomeRating, wealthRating, urbanicity, gender
+
+``` {r}
+donors.src.data <- donors.src.data %>%
+  filter(!is.na(incomeRating) & !is.na(wealthRating) & wealthRating > 0 & !is.na(urbanicity) & !is.na(gender))
+
+donors.src.data %>%
+  select(incomeRating, wealthRating, urbanicity, gender,isHomeowner) %>%
+  summary()
+
+```
+
+Remove feature: isHomeowner
+
+```{r}
+donors.model.data <- select(donors.src.data, -isHomeowner)
+```
+
+Review data cleansing progress
+
+``` {r}
+nrow(donors.model.data)
+donors.model.data %>%
+  summary()
+```
+
+Build Normalizaiton Function
+
+```{r}
+
+normalize <- function(x) {
+  return((x - min(x)) / (max(x) - min(x)))
+}
+
+```
+
+Apply Normalization Function to the dataset
+
+```{r}
+
+donors.model.data <- donors.model.data %>%
+  mutate(age = normalize(age)) %>%
+  mutate(numberChildren = normalize(numberChildren)) %>%
+  mutate(incomeRating = normalize(incomeRating)) %>%
+  mutate(wealthRating = normalize(wealthRating)) %>%
+  mutate(mailOrderPurchases = normalize(mailOrderPurchases)) %>%
+  mutate(totalGivingAmount = normalize(totalGivingAmount)) %>%
+  mutate(numberGifts = normalize(numberGifts)) %>%
+  mutate(smallestGiftAmount = normalize(smallestGiftAmount)) %>%
+  mutate(largestGiftAmount = normalize(largestGiftAmount)) %>%
+  mutate(averageGiftAmount = normalize(averageGiftAmount)) %>%
+  mutate(yearsSinceFirstDonation = normalize(yearsSinceFirstDonation)) %>%
+  mutate(monthsSinceLastDonation = normalize(monthsSinceLastDonation))
+
+donors.model.data %>%
+  summary()
+
+```
+
+Dealing with Categorical Features
+
+``` {r}
+class(donors.model.data)
+
+donors.model.data <- data.frame(donors.model.data)
+
+```
+Splitting and Balancing Data
+
+```{r}
+set.seed(1234)
+sample_donors_index <- sample(nrow(donors.model.data), round(nrow(donors.model.data) * .75), replace = FALSE)
+
+donors.model.data.train <- donors.model.data[sample_donors_index, ]
+donors.model.data.test <-  donors.model.data[-sample_donors_index, ]
+```
+
+Review class distribution (there is an imbalance)
+
+
+```{r}
+donors.model.data %>%
+  select(respondedMailing) %>%
+  table() %>%
+  prop.table() * 100
+```
+ Imbalance in training data
+ 
+```{r}
+donors.model.data.train %>%
+  select(respondedMailing) %>%
+  table() %>%
+  prop.table() * 100
+```
+ 
+Imbalance in testing data
+
+```{r}
+donors.model.data.test %>%
+  select(respondedMailing) %>%
+  table() %>%
+  prop.table() * 100
+```
+
+Balance the training data set with SMOTE()
+
+```{r}
+library(DMwR)
+set.seed(1234)
+
+donors.model.data.train <- SMOTE(respondedMailing ~ ., donors.model.data.train, perc.over = 100, perc.under = 200)
+
+donors.model.data.train %>%
+  select(respondedMailing) %>%
+  table() %>%
+  prop.table() * 100
+
+```
+
+Create vectors for labels for class features
+
+```{r}
+
+donors.train.labels <- as.factor(pull(donors.model.data.train, respondedMailing))
+donors.test.labels <-  as.factor(pull(donors.model.data.test, respondedMailing))
+
+```
+
+Split off the class labels from the rest of the data - (don't create dummy variables for the class)
+
+```{r}
+colnames(donors.model.data.train)
+colnames(donors.model.data.test)
+
+donors.model.train <- data.frame(select(donors.model.data.train, -respondedMailing))
+donors.model.test <- data.frame(select(donors.model.data.test, -respondedMailing))
+```
+
+Create dummy variables for test data
+
+```{r}
+library(dummies)
+
+donors.model.train <- dummy.data.frame(data = donors.model.train, sep = "_")
+
+```
+
+Create dummy variables for train data
+
+```{r}
+
+donors.model.test <- dummy.data.frame(data = donors.model.test, sep = "_")
+
+```
+
+<h2> Modeling </h2>
+
+Optimizing for value for k 
+
+```{r}
+
+k.value <- round(sqrt(nrow(donors.model.data)))
+k.value
+
+```
+
+Building the model
+
+```{r}
+library(class)
+
+donor.model.pred <- 
+  knn(
+    train = donors.train,
+    test = donors.test,
+    cl = donors.train.labels,
+    k = k.value
+  )
+
+```
+
+
+
+
+
+
+
+
+
+
+
+<h2> Evaluation </h2>

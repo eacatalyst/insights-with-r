@@ -1,0 +1,274 @@
+---
+title: "k-NN Donor Case Study"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+
+```{r}
+library(tidyverse)
+donors <- read_csv("data/donors.csv", col_types = "nnnnnnnnnnnnffffffffff")
+
+glimpse(donors)
+```
+Use only numeric features in dataset as predictors for the response
+
+```{r}
+donors <- donors %>%
+  select(
+    age,
+    numberChildren,
+    incomeRating,
+    wealthRating,
+    mailOrderPurchases,
+    totalGivingAmount,
+    numberGifts,
+    smallestGiftAmount,
+    largestGiftAmount,
+    averageGiftAmount,
+    yearsSinceFirstDonation,
+    monthsSinceLastDonation,
+    respondedMailing
+  )
+
+```
+
+Dealing with missing data
+
+``` {r}
+
+summary(donors)
+
+```
+
+Resolve missing age feature with mean imputation
+
+``` {r}
+donors <- donors %>%
+  mutate(age = ifelse(is.na(age), mean(age, na.rm = TRUE), age))
+
+summary(select(donors,age))
+
+```
+
+Resolve missing number of children with median imputation
+
+``` {r}
+donors <- donors %>%
+  mutate(numberChildren = ifelse(is.na(numberChildren), median(numberChildren, na.rm = TRUE), numberChildren))
+
+summary(select(donors, numberChildren))
+
+```
+
+Exclude values for incomeRating and wealthRating
+
+``` {r}
+donors <- donors %>%
+  filter(!is.na(incomeRating) & !is.na(wealthRating) & wealthRating > 0)
+
+donors %>%
+  select(incomeRating, wealthRating) %>%
+  summary()
+
+```
+
+Normalize the Data
+
+Build Normalization Function
+
+``` {r}
+normalize <- function(x) {
+  return((x - min(x)) / (max(x) - min(x)))
+}
+
+```
+
+Apply Normalizaiton Funciton to the dataset
+
+``` {r}
+donors <- donors %>%
+  mutate(age = normalize(age)) %>%
+  mutate(numberChildren = normalize(numberChildren)) %>%
+  mutate(incomeRating = normalize(incomeRating)) %>%
+  mutate(wealthRating = normalize(wealthRating)) %>%
+  mutate(mailOrderPurchases = normalize(mailOrderPurchases)) %>%
+  mutate(totalGivingAmount = normalize(totalGivingAmount)) %>%
+  mutate(numberGifts = normalize(numberGifts)) %>%
+  mutate(smallestGiftAmount = normalize(smallestGiftAmount)) %>%
+  mutate(largestGiftAmount = normalize(largestGiftAmount)) %>%
+  mutate(averageGiftAmount = normalize(averageGiftAmount)) %>%
+  mutate(yearsSinceFirstDonation = normalize(yearsSinceFirstDonation)) %>%
+  mutate(monthsSinceLastDonation = normalize(monthsSinceLastDonation))
+
+summary(donors)
+
+```
+
+Splitting the data (train/test)
+
+``` {r}
+donors <- data.frame(donors)
+
+
+set.seed(1234)
+
+sample_index <- sample(nrow(donors), round(nrow(donors) * .75), replace = FALSE)
+donors_train <- donors[sample_index, ]
+donors_test <- donors[-sample_index, ]
+```
+
+Review dataset class distribution (imbalance)
+
+Imbalance donors data set
+``` {r}
+
+round(prop.table(table(select(donors, respondedMailing), exclude = NULL)), 4)
+
+donors %>%
+  select(respondedMailing) %>%
+  table(exclude = NULL) %>%
+  prop.table() %>%
+  round(4) * 100
+
+
+
+```
+
+Imbalance donors train data set
+
+``` {r}
+
+donors_train %>%
+  select(respondedMailing) %>%
+  table(exclude = NULL) %>%
+  prop.table() %>%
+  round(4) * 100
+
+```
+
+Imbalance donors test data set
+
+``` {r}
+
+donors_test %>%
+  select(respondedMailing) %>%
+  table(exclude = NULL) %>%
+  prop.table() %>%
+  round(4) * 100
+
+```
+
+Balance the training data set 
+
+``` {r}
+library(DMwR)
+set.seed(1234)
+
+donors_train <- SMOTE(respondedMailing ~ ., donors_train, perc.over = 100, perc.under = 200)
+
+donors_train %>%
+  select(respondedMailing) %>%
+  table(exclude = NULL) %>%
+  prop.table() %>%
+  round(4) * 100
+```
+
+Splitt off the class lables into seperate data sets with pull()
+
+``` {r}
+
+donors_train_labels <- as.factor(pull(donors_train, respondedMailing))
+donors_test_labels <- as.factor(pull(donors_test, respondedMailing))
+
+```
+
+Remove the class labels from our training and test datasets
+
+```{r}
+donors_train <- data.frame(select(donors_train, -respondedMailing))
+donors_test <-  data.frame(select(donors_test, -respondedMailing))
+
+```
+
+Build The Model
+
+``` {r}
+library(class)
+
+donors_pred <- 
+  knn(
+    train = donors_train,
+    test = donors_test,
+    cl = donors_train_labels,
+    k = 5
+  )
+
+head(donors_pred)
+```
+
+Evaluating the Model
+
+```{r}
+
+donors_pred_table <- table(donors_test_labels, donors_pred)
+donors_pred_table
+
+```
+
+Model Accuracy as percentage
+
+``` {r}
+sum(diag(donors_pred_table)) / nrow(donors_test) * 100
+
+```
+
+Remodel including categorical variables - adjust value of k
+* Approach to set the value of k as the square root of the number of training instances
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
