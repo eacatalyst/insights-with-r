@@ -72,10 +72,47 @@ set.seed(1234)
 imcome_mod <- train(
   income ~ . ,
   data = income_train,
-  metric = "Accurary",
+  metric = "Accuracy",
   method = "rpart",
   trControl = trainControl(method = "LGOCV", p= .1, number = 10)
 )
+
+income_mod$resample %>%
+  arrange(Resample)
+
+library(rpart)
+set.seed(1234)
+
+income_mod <- train(
+  income ~ . ,
+  data = income_train,
+  metric = "Accuracy",
+  method = "rpart",
+  trControl = trainControl(method = "boot632", number = 4)
+)
+
+income_mod$resample %>%
+  arrange(Resample)
+
+
+load("Student/Data/spam.RData")
+
+spam_matrix <- 
+  confusionMatrix(email_pred,email_test$message_label, positive = "spam")
+spam_matrix
+
+spam_accurcy <- as.numeric(spam_matrix$overall["Accuracy"])
+spam_accurcy
+
+spam_kappa <- as.numeric(spam_matrix$overall["Kappa"])
+spam_kappa
+
+
+
+
+
+
+
 
 
 
