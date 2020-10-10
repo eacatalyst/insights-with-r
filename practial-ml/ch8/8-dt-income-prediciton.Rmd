@@ -1,0 +1,158 @@
+---
+title: "Income Prediction with Decision Trees"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  word_document: default
+---
+
+<h2> Business Understanding </h2>
+
+Objective is to use information about existing customers of a financial services company to develop a model that predicts whether a customer has an income of $50,000 or more. The motivation for this problem is to identify potential high-income customers from a prospective customer database that was recently purchase
+
+This problems is going to be solved using a classification tree
+
+<h2> Data Understanding </h2>
+
+```{r}
+library(tidyverse)
+income <- read_csv("Student/Data/income.csv", col_types = "nffnfffffnff")
+glimpse(income)
+
+```
+
+<h3> Exploring the data </h3>
+
+```{r}
+summary(income)
+
+```
+<h2> Data Preparation </h2>
+
+Splitting test and train data
+
+```{r}
+set.seed(1234)
+sample_set <- sample(nrow(income), round(nrow(income) * .75), replace = FALSE)
+
+income_train <- income[sample_set, ]
+income_test <- income[-sample_set, ]
+```
+
+Review data set balance
+
+```{r}
+income %>%
+  select(income) %>%
+  table(exclude = NULL) %>%
+  prop.table() %>%
+  round(4) * 100
+```
+
+Review test data set balance
+
+```{r}
+income_test %>%
+  select(income) %>%
+  table(exclude = NULL) %>%
+  prop.table() %>%
+  round(4) * 100
+```
+
+Review train data set balance
+
+```{r}
+income_train %>%
+  select(income) %>%
+  table(exclude = NULL) %>%
+  prop.table() %>%
+  round(4) * 100
+```
+
+<h3> Balancing the Training  Data Set </h3>
+
+```{r}
+
+library(DMwR)
+set.seed(1234)
+
+income_train <- SMOTE(income ~ ., data.frame(income_train), perc.over = 100, perc.under = 200)
+
+income_train %>%
+  select(income) %>%
+  table(exclude = NULL) %>%
+  prop.table() %>%
+  round(4) * 100
+
+```
+
+<h2> Modeling </h2>
+
+Training the model
+
+```{r}
+library(rpart)
+
+income_mod <- 
+  rpart (
+    income ~ ., 
+    method = "class", 
+    data = income_train
+  )
+
+```
+
+
+<h2> Model Evaluation </h2>
+
+Plot the Decision Tree
+
+```{r}
+
+library(rpart.plot)
+rpart.plot(income_mod)
+
+```
+
+Confusion Matrix
+
+```{r}
+
+income_pred <-  predict(income_mod, income_test, type = "class")
+income_pred_table <- table(income_test$income, income_pred)
+income_pred_table
+```
+
+Prediction Accuracy
+
+```{r}
+
+sum(diag(income_pred_table)) / nrow(income_test)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
