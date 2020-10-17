@@ -188,12 +188,27 @@ models <- caretList(
 )
 
 results <-  resamples(models)
+summary(results)
 
+modelCor(results)
 
+library(randomForest)
 
+stack_mod <- caretStack(
+  models,
+  method = "rf",
+  metric = "Accuracy",
+  trControl = trainControl(
+    method = "repeatedcv",
+    number = 10,
+    savePredictions = "final",
+    classProbs = TRUE
+  )
+)
 
-
-
+# Stopping point ----
+stack_pred <- predict(stack_mod, income_test)
+confusionMatrix(stack_pred, income_test$income, positive = "Below")
 
 
 
