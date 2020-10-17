@@ -72,10 +72,73 @@ set.seed(1234)
 imcome_mod <- train(
   income ~ . ,
   data = income_train,
-  metric = "Accurary",
+  metric = "Accuracy",
   method = "rpart",
   trControl = trainControl(method = "LGOCV", p= .1, number = 10)
 )
+
+
+income_mod$resample %>%
+  arrange(Resample) %>%
+  summarise(AvgAccuracy_lgocv = mean(Accuracy))
+
+# Load R Data Set
+
+load("Student/Data/spam.RData")
+
+spam_matrix <- 
+  confusionMatrix(email_pred, email_test$message_label, positive = "spam")
+spam_matrix
+
+spam_accuracy <- as.numeric(spam_matrix$overall["Accuracy"])
+spam_accuracy
+
+spam_kappa <- as.numeric(spam_matrix$overall["Kappa"])
+spam_kappa
+
+spam_sensitivity <- 
+  sensitivity(email_pred, email_test$message_label, positive = "spam")
+spam_sensitivity
+
+spam_specificity <- 
+  specificity(email_pred, email_test$message_label, negative = "ham")
+spam_specificity
+
+spam_precision <- 
+  posPredValue(email_pred, email_test$message_label, positive="spam")
+spam_precision
+
+spam_recall <- spam_sensitivity
+spam_recall
+
+load("Student/Data/spam.RData")
+
+library(e1071)
+email_pred_prod <- predict(email_mod, email_test, type = "raw")
+head(email_pred_prod)
+
+library(ROCR)
+
+roc_pred <- 
+  prediction(
+    predictions = email_pred_prod[,"spam"],
+    labels = email_test$message_label
+  )
+
+roc_perf <- performance(roc_pred, measure = "tpr", x.measure = "fpr")
+
+plot(roc_perf, main = "ROC Curve", col = "green", lwd = 3)
+abline(a = 0, b = 1, lwd = 3, lty = 2, col = 1)
+
+auc_perf <- performance(roc_pred, measure = "auc")
+
+spam_auc <-  unlist(slot(auc_perf, "y.values"))
+spam_auc
+
+
+
+
+
 
 
 
