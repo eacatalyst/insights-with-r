@@ -1,0 +1,139 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+<h2> Data Understanding </h2>
+
+```{r}
+library(arules)
+
+groceries <- read.transactions("Student/Data/groceries.csv", sep = ",")
+```
+
+
+<h3> Exploring the Data </h3>
+
+```{r}
+summary(groceries)
+```
+
+10 most frequenty bought items at the store
+
+```{r}
+library(tidyverse)
+groceries_frequency <- 
+  tibble(
+    Items = names(itemFrequency(groceries)),
+    Frequency = itemFrequency(groceries)
+  )
+```
+
+
+```{r}
+groceries_frequency %>%
+  arrange(desc(Frequency)) %>%
+  slice(1:10)
+
+```
+
+Summary statistics of item frequencies
+
+```{r}
+
+groceries_frequency %>%
+  select(Frequency) %>%
+  summary()
+
+```
+Generating Rules
+
+```{r}
+
+groceryrules <- 
+  apriori(groceries,
+          parameter = list (
+            support = 0.015,
+            confidence = 0.25,
+            minlen = 2
+          ))
+
+```
+Evaluatiing The Rules
+
+```{r}
+summary(groceryrules)
+```
+
+Top 10 rules in terms of confidence
+
+```{r}
+groceryrules %>%
+  sort(by = "confidence") %>%
+  head(n = 10) %>%
+  inspect()
+
+```
+
+Different Perspective
+
+```{r}
+
+groceryrules %>%
+  sort(by = "lift") %>%
+  head(n = 10) %>%
+  inspect()
+```
+
+```{r}
+groceryrules %>%
+  subset(!items %in% c("whole milk", "other vegetables")) %>%
+  sort(by = "lift") %>%
+  inspect()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
