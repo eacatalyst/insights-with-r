@@ -1,0 +1,116 @@
+---
+title: "Segmenting Shopping Mall Customers"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+<h2> Business Understanding </h2>
+
+Our goal is to segment customers based on Income and SpendingScore
+
+```{r}
+library(tidyverse)
+mallcustomers <- read_csv("Student/Data/mallcustomers.csv")
+glimpse(mallcustomers)
+```
+
+<h2> Data Understanding </h2>
+
+Convert income feature to a string
+
+```{r}
+library(stringr)
+
+mallcustomers <-  mallcustomers %>%
+  mutate(Income = str_replace_all(Income, " USD", "")) %>%
+  mutate(Income = str_replace_all(Income, ",", "")) %>%
+  mutate(Income = as.numeric(Income))
+
+summary(mallcustomers)
+```
+
+<h2> Data Preparation </h2>
+
+Normalize Income and SpendingScore features - z-score
+
+```{r}
+mallcustomers_scaled <- mallcustomers %>%
+  select(-CustomerID, -Gender, -Age) %>%
+  scale()
+
+summary(mallcustomers_scaled)
+
+```
+
+<h2> Modeling </h2>
+
+Obtain recommended value of (k)
+
+Elbow Method
+```{r}
+library(factoextra)
+fviz_nbclust(mallcustomers_scaled, kmeans, method = "wss")
+```
+
+Silhouette Method
+```{r}
+fviz_nbclust(mallcustomers_scaled, kmeans, method = "silhouette")
+
+```
+Gap Statistic
+```{r}
+fviz_nbclust(mallcustomers_scaled, kmeans, method = "gap_stat")
+
+```
+
+<h3> Building The Model </h3>
+
+```{r}
+set.seed(1234)
+k_clust <- kmeans(mallcustomers_scaled, centers = 6, nstart = 25)
+
+fviz_cluster(
+  k_clust,
+  data = mallcustomers_scaled,
+  main = "Mall Customers Segmented by Income and Spending Score",
+  repel = TRUE
+)
+
+```
+
+<h2> Evaluating The Model </h2>
+
+```{r}
+
+mallcustomers %>%
+  mutate(cluster = k_clust$cluster) %>%
+  mutate(Male = ifelse(Gender == "Male", 1, 0)) %>%
+  mutate(Female = ifelse(Gender == "Female", 1, 0)) %>%
+  select(cluster, Male, Female, Age) %>%
+  group_by(cluster) %>%
+  summarise_all("mean")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

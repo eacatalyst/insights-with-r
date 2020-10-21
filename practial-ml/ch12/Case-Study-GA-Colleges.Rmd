@@ -1,0 +1,32 @@
+---
+title: "GA School Clusters"
+output: html_notebook
+---
+
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+colleges <- read_csv("Student/Data/college.csv", col_types = "nccfffffnnnnnnnnn")
+glimpse(colleges)
+```
+
+Filter on GA data
+
+```{r}
+ga_colleges <- colleges %>%
+  filter(state == "GA") %>%
+  column_to_rownames(var = "name")
+
+summary(ga_colleges)
+```
+Review GA College Data
+
+```{r}
+ga_colleges %>%
+  select(admission_rate, sat_avg) %>%
+  summary()
+
+```
+
